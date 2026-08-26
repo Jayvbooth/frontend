@@ -1,0 +1,21 @@
+name: Export Ticket 02 V2 Source
+
+on:
+  push:
+    branches:
+      - temp/export-ticket02-v2-frontend
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ticket02-v2-frontend-source
+          path: .
+          include-hidden-files: true
+          retention-days: 1
