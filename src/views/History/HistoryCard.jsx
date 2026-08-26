@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useLocalization } from '../../contexts/LocalizationContext'
 import { TASK_COLOR } from '../../utils/Colors.jsx'
+import { formatSignedPoints, getScoreBreakdown } from '../../utils/ScoreResult'
 import PendingBadge from '../components/PendingBadge'
 
 const formatTime = seconds => {
@@ -102,6 +103,15 @@ const HistoryCard = ({
   const plainTextNotes = historyEntry.notes
     ? stripHtmlTags(historyEntry.notes)
     : ''
+  const scoreBreakdown = getScoreBreakdown(historyEntry)
+  const scoreLine =
+    scoreBreakdown.length > 0
+      ? scoreBreakdown
+          .map(([key, value]) =>
+            t(`card.score.${key}`, { value: formatSignedPoints(value) }),
+          )
+          .join(' · ')
+      : null
 
   const metaTextParts = [
     fmt.dateTime(actionDate),
@@ -111,8 +121,10 @@ const HistoryCard = ({
     historyEntry?.duration > 0
       ? `⏱ ${formatTime(historyEntry.duration)}`
       : null,
-    historyEntry?.points > 0
-      ? t('card.points', { count: historyEntry.points })
+    historyEntry?.points !== null && historyEntry?.points !== undefined
+      ? t('card.score.total', {
+          value: formatSignedPoints(historyEntry.points),
+        })
       : null,
   ].filter(Boolean)
 
@@ -164,6 +176,14 @@ const HistoryCard = ({
         {timingLine && (
           <Typography level='body-xs' sx={{ color: 'text.tertiary', mb: 0.25 }}>
             {timingLine}
+          </Typography>
+        )}
+        {scoreLine && (
+          <Typography
+            level='body-xs'
+            sx={{ color: 'text.secondary', mb: 0.25 }}
+          >
+            {scoreLine}
           </Typography>
         )}
 

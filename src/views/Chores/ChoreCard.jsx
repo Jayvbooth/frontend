@@ -35,6 +35,7 @@ import {
 import { notInCompletionWindow } from '../../utils/Chores.jsx'
 import { getTextColorFromBackgroundColor } from '../../utils/Colors.jsx'
 import Priorities from '../../utils/Priorities'
+import { getAvailablePoints } from '../../utils/ScoreResult'
 import ChoreActionMenu from '../components/ChoreActionMenu'
 import PendingBadge from '../components/PendingBadge'
 const ChoreCard = ({
@@ -285,7 +286,7 @@ const ChoreCard = ({
                       </Chip>
                     )}
                     {/* show points chip if there is points assigned */}
-                    {chore.points > 0 && (
+                    {getAvailablePoints(chore) > 0 && (
                       <Chip
                         sx={{
                           position: 'relative',
@@ -296,7 +297,11 @@ const ChoreCard = ({
                         color='success'
                         startDecorator={<Toll />}
                       >
-                        {chore.points}
+                        {chore.earlyBonus && chore.timingMode === 'deadline'
+                          ? t('scoring.upToShort', {
+                              count: getAvailablePoints(chore),
+                            })
+                          : getAvailablePoints(chore)}
                       </Chip>
                     )}
                     {chore.labelsV2?.map((l, index) => {

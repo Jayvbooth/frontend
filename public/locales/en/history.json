@@ -33,7 +33,13 @@
     "hoursAfterDue_other": "{{count}}h after due date",
     "assignedTo": "Assigned to {{name}}",
     "points_one": "★ {{count}} pt",
-    "points_other": "★ {{count}} pts"
+    "points_other": "★ {{count}} pts",
+    "score": {
+      "base": "Base {{value}}",
+      "timing": "Timing {{value}}",
+      "recovery": "Recovery {{value}}",
+      "total": "★ {{value}} pts"
+    }
   },
   "detail": {
     "title": "Activity Detail",

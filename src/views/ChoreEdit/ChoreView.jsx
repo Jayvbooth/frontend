@@ -16,6 +16,7 @@ import {
   SwitchAccessShortcut,
   ThumbDown,
   ThumbUp,
+  Toll,
   Unarchive,
 } from '@mui/icons-material'
 import {
@@ -81,6 +82,7 @@ import {
 } from '../../utils/Fetcher'
 import { offlineDB } from '../../utils/OfflineDB'
 import { getSafeBottomPadding } from '../../utils/SafeAreaUtils.js'
+import { getAvailablePoints, getScoreFeedback } from '../../utils/ScoreResult'
 import ChoreActionMenu from '../components/ChoreActionMenu'
 import DueDatePickerModal, {
   combineDueDate,
@@ -246,6 +248,20 @@ const ChoreView = () => {
           }`,
         },
       ]
+      if (getAvailablePoints(chore) > 0) {
+        cards.push({
+          size: 6,
+          icon: <Toll />,
+          title: t('scoring.reward'),
+          text:
+            chore.earlyBonus && chore.timingMode === 'deadline'
+              ? t('scoring.upToPoints', {
+                  count: getAvailablePoints(chore),
+                })
+              : t('scoring.points', { count: getAvailablePoints(chore) }),
+          subtext: t(`scoring.modes.${chore.timingMode || 'untimed'}.label`),
+        })
+      }
       setInfoCards(cards)
     }
   }, [chore, performers, completionCount, t])
@@ -281,7 +297,9 @@ const ChoreView = () => {
         }
         showSuccess({
           title: t('choreView.taskCompleted'),
-          message: t('choreView.taskCompletedMessage'),
+          message:
+            getScoreFeedback(data.score, t) ||
+            t('choreView.taskCompletedMessage'),
           undoAction: async () => {
             try {
               const undoResponse = await UndoChoreAction(choreId)
@@ -544,6 +562,10 @@ const ChoreView = () => {
         response.json().then(data => {
           setChore(data.res)
           queryClient.invalidateQueries(['chores'])
+          const message = getScoreFeedback(data.score, t)
+          if (message) {
+            showSuccess({ title: t('choreView.taskCompleted'), message })
+          }
         })
       }
     })

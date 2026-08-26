@@ -24,6 +24,7 @@ import {
 } from '../../../utils/Fetcher'
 import { offlineDB } from '../../../utils/OfflineDB'
 import { isOfflineFeatureEnabled } from '../../../utils/OfflineFeatureToggle'
+import { getScoreFeedback } from '../../../utils/ScoreResult'
 
 // Effectively "can this action be queued offline?" — requires the offline
 // feature, otherwise there is no command queue to replay it later.
@@ -81,7 +82,7 @@ export const useChoreActions = ({
   const pauseChore = usePauseChore()
 
   const updateChoreInState = useCallback(
-    (updatedChore, event, { skipInvalidation = false } = {}) => {
+    (updatedChore, event, { message, skipInvalidation = false } = {}) => {
       let newChores = chores.map(c =>
         c.id === updatedChore.id ? updatedChore : c,
       )
@@ -116,7 +117,7 @@ export const useChoreActions = ({
 
       if (undoableActions[event]) {
         showSuccess({
-          message: undoableActions[event],
+          message: message || undoableActions[event],
           undoAction: async () => {
             try {
               const undoResponse = await UndoChoreAction(updatedChore.id)
@@ -202,6 +203,7 @@ export const useChoreActions = ({
       showError,
       showWarning,
       showUndo,
+      t,
     ],
   )
 
@@ -219,6 +221,8 @@ export const useChoreActions = ({
               null,
             )
             if (response.ok) {
+              const data = await response.json()
+              const scoreMessage = getScoreFeedback(data.score, t)
               // Online: hide the chore and show undo
               setChores(prev => prev.filter(c => c.id !== chore.id))
               setFilteredChores(prev => prev.filter(c => c.id !== chore.id))
@@ -230,7 +234,7 @@ export const useChoreActions = ({
                 }
               })
               showSuccess({
-                message: t('actions.undoable.completed'),
+                message: scoreMessage || t('actions.undoable.completed'),
                 undoAction: async () => {
                   try {
                     const undoResponse = await UndoChoreAction(chore.id)
@@ -411,7 +415,9 @@ export const useChoreActions = ({
             const response = await ApproveChore(chore.id)
             if (response.ok) {
               const data = await response.json()
-              updateChoreInState(data.res, 'approved')
+              updateChoreInState(data.res, 'approved', {
+                message: getScoreFeedback(data.score, t),
+              })
             }
           } catch (error) {
             showError({
@@ -818,13 +824,15 @@ export const useChoreActions = ({
         if (response.ok) {
           response.json().then(data => {
             const newChore = data.res
-            updateChoreInState(newChore, 'completed')
+            updateChoreInState(newChore, 'completed', {
+              message: getScoreFeedback(data.score, t),
+            })
           })
         }
       })
       closeModal()
     },
-    [modalChore, impersonatedUser, updateChoreInState, closeModal],
+    [modalChore, impersonatedUser, updateChoreInState, closeModal, t],
   )
 
   const handleAssigneeChange = useCallback(
@@ -857,13 +865,15 @@ export const useChoreActions = ({
         if (response.ok) {
           response.json().then(data => {
             const newChore = data.res
-            updateChoreInState(newChore, 'completed')
+            updateChoreInState(newChore, 'completed', {
+              message: getScoreFeedback(data.score, t),
+            })
           })
         }
       })
       closeModal()
     },
-    [modalChore, impersonatedUser, updateChoreInState, closeModal],
+    [modalChore, impersonatedUser, updateChoreInState, closeModal, t],
   )
 
   const handleNudge = useCallback(

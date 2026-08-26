@@ -895,6 +895,39 @@
       "dayOfMonth": "Day of month"
     }
   },
+  "scoring": {
+    "timingMode": "Timing reward",
+    "earlyBonus": "Early bonus",
+    "earlyBonusDescription": "Earn up to 20% extra when finishing before a useful deadline.",
+    "reward": "Reward",
+    "points": "{{count}} points",
+    "upToPoints": "Up to {{count}} points",
+    "upToShort": "up to {{count}}",
+    "completedFeedback": "{{total}} points · {{breakdown}}",
+    "breakdown": {
+      "base": "Base {{value}}",
+      "timing": "Timing {{value}}",
+      "recovery": "Recovery {{value}}"
+    },
+    "modes": {
+      "untimed": {
+        "label": "Any time",
+        "description": "Always awards the fixed point value."
+      },
+      "today": {
+        "label": "By end of day",
+        "description": "Full points through the due date in your local timezone."
+      },
+      "deadline": {
+        "label": "By due time",
+        "description": "Uses the grace period and gradual late-point reductions."
+      },
+      "window": {
+        "label": "Inside time window",
+        "description": "Can only be completed after its allowed start time."
+      }
+    }
+  },
   "advancedOptions": {
     "points": "Points",
     "pointsDescription": "Award points for completing this task",

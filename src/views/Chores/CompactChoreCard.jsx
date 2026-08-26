@@ -26,6 +26,7 @@ import {
   getPriorityColor,
   getTextColorFromBackgroundColor,
 } from '../../utils/Colors.jsx'
+import { getAvailablePoints } from '../../utils/ScoreResult'
 import ChoreActionMenu from '../components/ChoreActionMenu'
 import PendingBadge from '../components/PendingBadge'
 
@@ -103,8 +104,10 @@ const CompactChoreCard = ({
     }
 
     // Points
-    if (chore.points > 0) {
-      parts.push(`${chore.points}pts`)
+    if (getAvailablePoints(chore) > 0) {
+      const prefix =
+        chore.earlyBonus && chore.timingMode === 'deadline' ? '≤' : ''
+      parts.push(`${prefix}${getAvailablePoints(chore)}pts`)
     }
 
     return parts.join(' • ')

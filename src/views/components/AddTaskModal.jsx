@@ -303,6 +303,8 @@ const TaskInput = ({ initialMode, isModalOpen, onChoreUpdate, onClose }) => {
   }))
   const [subTasks, setSubTasks] = useState(null)
   const [points, setPoints] = useState(-1)
+  const [timingMode, setTimingMode] = useState('untimed')
+  const [earlyBonus, setEarlyBonus] = useState(false)
   const [isAnyoneTask, setIsAnyoneTask] = useState(false)
   const [hasDescription, setHasDescription] = useState(false)
   const [hasSubTasks, setHasSubTasks] = useState(false)
@@ -869,6 +871,13 @@ const TaskInput = ({ initialMode, isModalOpen, onChoreUpdate, onClose }) => {
     }
   }
 
+  useEffect(() => {
+    if (!dueDate && timingMode !== 'untimed') {
+      setTimingMode('untimed')
+      setEarlyBonus(false)
+    }
+  }, [dueDate, timingMode])
+
   const handleEnterPressed = () => {
     submitChore()
   }
@@ -1002,6 +1011,8 @@ const TaskInput = ({ initialMode, isModalOpen, onChoreUpdate, onClose }) => {
     setFrequency(null)
     setPriority(0)
     setPoints(-1)
+    setTimingMode('untimed')
+    setEarlyBonus(false)
     setIsAnyoneTask(false)
     setHasDescription(false)
     setDescription(null)
@@ -1061,6 +1072,8 @@ const TaskInput = ({ initialMode, isModalOpen, onChoreUpdate, onClose }) => {
       labelsV2: labelsV2,
       priority: priority ? Number(priority) : 0,
       points: points > -1 ? points : null,
+      timingMode: points > -1 ? timingMode : 'untimed',
+      earlyBonus: points > -1 && timingMode === 'deadline' && earlyBonus,
       deadlineOffset: deadlineOffset < 0 ? null : deadlineOffset,
       completionWindow:
         completionWindow < 0 || !dueDate ? null : completionWindow,
@@ -1528,6 +1541,8 @@ const TaskInput = ({ initialMode, isModalOpen, onChoreUpdate, onClose }) => {
                 activeCount={
                   [
                     points > -1,
+                    points > -1 && timingMode !== 'untimed',
+                    points > -1 && earlyBonus,
                     requireApproval,
                     completionWindow > -1,
                     deadlineOffset > -1,
@@ -1541,6 +1556,10 @@ const TaskInput = ({ initialMode, isModalOpen, onChoreUpdate, onClose }) => {
               open={showAdvanced}
               points={points}
               onPointsChange={setPoints}
+              timingMode={timingMode}
+              onTimingModeChange={setTimingMode}
+              earlyBonus={earlyBonus}
+              onEarlyBonusChange={setEarlyBonus}
               requireApproval={requireApproval}
               onRequireApprovalChange={setRequireApproval}
               completionWindow={completionWindow}
