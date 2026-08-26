@@ -73,6 +73,7 @@ import { useProjectFilter } from '../Chores/hooks/useProjectFilter.js'
 import LoadingComponent from '../components/Loading.jsx'
 import RichTextEditor from '../components/RichTextEditor.jsx'
 import SubTasks from '../components/SubTask.jsx'
+import TimingScoreFields from '../components/TimingScoreFields'
 import { useLabels } from '../Labels/LabelQueries'
 import AttachmentViewerModal from '../Modals/Inputs/AttachmentViewerModal'
 import ConfirmationModal from '../Modals/Inputs/ConfirmationModal'
@@ -123,6 +124,8 @@ const ChoreEdit = () => {
   const [labelsV2, setLabelsV2] = useState([])
   const [priority, setPriority] = useState(0)
   const [points, setPoints] = useState(-1)
+  const [timingMode, setTimingMode] = useState('untimed')
+  const [earlyBonus, setEarlyBonus] = useState(false)
   const [requireApproval, setRequireApproval] = useState(false)
   const [isPrivate, setIsPrivate] = useState(false)
   const [subTasks, setSubTasks] = useState(null)
@@ -392,6 +395,8 @@ const ChoreEdit = () => {
       notificationMetadata: notificationMetadata,
       thingTrigger: thingTrigger,
       points: points < 0 ? null : points,
+      timingMode: points < 0 ? 'untimed' : timingMode,
+      earlyBonus: points >= 0 && timingMode === 'deadline' && earlyBonus,
       requireApproval: requireApproval,
       isPrivate: isPrivate,
       completionWindow:
@@ -564,6 +569,8 @@ const ChoreEdit = () => {
 
       setNotificationMetadata(data.res.notificationMetadata)
       setPoints(data.res.points && data.res.points > -1 ? data.res.points : -1)
+      setTimingMode(data.res.timingMode || 'untimed')
+      setEarlyBonus(Boolean(data.res.earlyBonus))
       setRequireApproval(data.res.requireApproval || false)
       setIsPrivate(data.res.isPrivate || false)
       setCompletionWindow(
@@ -665,6 +672,13 @@ const ChoreEdit = () => {
       setDueTime(null)
     }
   }, [frequencyType])
+
+  useEffect(() => {
+    if (!dueDate && timingMode !== 'untimed') {
+      setTimingMode('untimed')
+      setEarlyBonus(false)
+    }
+  }, [dueDate, timingMode])
 
   // useEffect(() => {
   //   if (performers.length > 0 && assignees.length === 0 && userProfile) {
@@ -1827,6 +1841,17 @@ const ChoreEdit = () => {
                     setPoints(parseInt(e.target.value))
                   }}
                 />
+                {points > 0 && (
+                  <TimingScoreFields
+                    timingMode={timingMode}
+                    earlyBonus={earlyBonus}
+                    hasDueDate={Boolean(dueDate)}
+                    completionWindow={completionWindow}
+                    onTimingModeChange={setTimingMode}
+                    onEarlyBonusChange={setEarlyBonus}
+                    onCompletionWindowChange={setCompletionWindow}
+                  />
+                )}
               </Box>
             </Card>
           )}

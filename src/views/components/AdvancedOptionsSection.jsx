@@ -20,6 +20,8 @@ import {
 } from '@mui/joy'
 import { useTranslation } from 'react-i18next'
 
+import TimingScoreFields from './TimingScoreFields'
+
 const STRATEGY_VALUES = [
   'keep_last_assigned',
   'random',
@@ -141,6 +143,7 @@ const AdvancedOptionsSection = ({
   assignStrategy,
   completionWindow,
   deadlineOffset,
+  earlyBonus,
   hasAssignees,
   hasDueDate,
   hasMultipleAssignees,
@@ -148,12 +151,15 @@ const AdvancedOptionsSection = ({
   onAssignStrategyChange,
   onCompletionWindowChange,
   onDeadlineOffsetChange,
+  onEarlyBonusChange,
   onIsPrivateChange,
   onPointsChange,
   onRequireApprovalChange,
+  onTimingModeChange,
   open,
   points,
   requireApproval,
+  timingMode,
 }) => {
   const { t } = useTranslation('chores')
   const displayPoints = points <= 0 ? 0 : points
@@ -238,6 +244,18 @@ const AdvancedOptionsSection = ({
               <Add sx={{ fontSize: 16 }} />
             </IconButton>
           </FieldRow>
+
+          {displayPoints > 0 && (
+            <TimingScoreFields
+              timingMode={timingMode}
+              earlyBonus={earlyBonus}
+              hasDueDate={hasDueDate}
+              completionWindow={completionWindow}
+              onTimingModeChange={onTimingModeChange}
+              onEarlyBonusChange={onEarlyBonusChange}
+              onCompletionWindowChange={onCompletionWindowChange}
+            />
+          )}
 
           {/* Require approval */}
           <FieldRow
