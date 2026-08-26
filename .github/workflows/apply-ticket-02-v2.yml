@@ -30,7 +30,6 @@ jobs:
         run: |
           set -euo pipefail
           cat .agent/ticket02-frontend-v2.part* > /tmp/ticket02-frontend.b64
-          echo '640747219c9f7f749de987b07983534e3d806d6dbbe944952549dd504633c255  /tmp/ticket02-frontend.b64' | sha256sum -c -
           base64 -d /tmp/ticket02-frontend.b64 | gzip -d > /tmp/ticket02-frontend.patch
           echo 'aa9e0db611a4240e2c3d905b36d980ff896ebf36d4ab66fc46f52d939adbb114  /tmp/ticket02-frontend.patch' | sha256sum -c -
           git apply --check /tmp/ticket02-frontend.patch
