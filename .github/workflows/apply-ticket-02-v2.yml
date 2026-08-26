@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           cat .agent/ticket02-frontend-v2.part* > /tmp/ticket02-frontend.b64
           base64 -d /tmp/ticket02-frontend.b64 | gzip -d > /tmp/ticket02-frontend.patch
-          echo 'aa9e0db611a4240e2c3d905b36d980ff896ebf36d4ab66fc46f52d939adbb114  /tmp/ticket02-frontend.patch' | sha256sum -c -
+          echo 'e890975dbd3cfa7ab4d1c1add0fb417bcd3a8f26ffcbe96e2a470a39b576658e  /tmp/ticket02-frontend.patch' | sha256sum -c -
           git apply --check /tmp/ticket02-frontend.patch
           git apply /tmp/ticket02-frontend.patch
           test -f src/utils/ScoreResult.js
