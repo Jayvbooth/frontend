@@ -1,0 +1,62 @@
+name: Apply Ticket 02 Frontend
+
+on:
+  push:
+    branches:
+      - feature/02-timing-aware-scoring-real
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ticket-02-frontend-real
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[ticket-02-frontend]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Fetch and apply the production patch
+        run: |
+          set -euo pipefail
+          for name in apply_ticket_02_frontend.py apply_02_frontend.py apply_ticket_02.py; do
+            url="https://raw.githubusercontent.com/Jayvbooth/frontend/temp/ticket02-frontend-source/.agent/${name}"
+            if curl -fsSL "$url" -o /tmp/apply_ticket_02_frontend.py; then
+              break
+            fi
+          done
+          test -s /tmp/apply_ticket_02_frontend.py
+          python /tmp/apply_ticket_02_frontend.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint and audit localization
+        run: npm run lint
+
+      - name: Build production frontend
+        run: npm run build
+
+      - name: Remove temporary automation
+        run: rm .github/workflows/apply-ticket-02-frontend.yml
+
+      - name: Validate diff
+        run: git diff --check
+
+      - name: Commit verified implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: add timing-aware score controls [ticket-02-frontend]'
+          git push origin HEAD:feature/02-timing-aware-scoring-real
