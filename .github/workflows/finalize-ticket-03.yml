@@ -1,0 +1,142 @@
+name: Finalize Ticket 03
+
+on:
+  push:
+    branches:
+      - temp/finalize-ticket03
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-ticket-03
+  cancel-in-progress: false
+
+jobs:
+  review-and-merge:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Wait for verified feature source
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            rm -rf feature
+            if git clone --quiet --branch feature/03-focused-today --single-branch "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" feature; then
+              if [ -f feature/src/views/Today/Today.jsx ] \
+                && [ -f feature/src/utils/TodaySections.js ] \
+                && [ -f feature/src/utils/TodaySections.test.js ] \
+                && [ ! -d feature/.agent ] \
+                && [ ! -e feature/.github/workflows/apply-ticket-03.yml ]; then
+                exit 0
+              fi
+            fi
+            sleep 15
+          done
+          echo 'Verified Ticket 03 source never landed on the feature branch.' >&2
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: feature/package-lock.json
+
+      - name: Install dependencies
+        working-directory: feature
+        run: npm ci
+
+      - name: Matt Standards verification
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          npm run lint
+          node --test src/utils/TodaySections.test.js
+          npm run build
+          git diff --check origin/develop...HEAD
+
+      - name: Matt Spec verification
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          grep -q "element: <Today" src/contexts/RouterContext.jsx
+          grep -q "path: '/chores'" src/contexts/RouterContext.jsx
+          grep -q "MAX_PRIORITIES" src/utils/TodaySections.js
+          grep -q "overdue" src/utils/TodaySections.js
+          grep -q "routines" src/utils/TodaySections.js
+          grep -q "flexible" src/utils/TodaySections.js
+          grep -q "fullTaskList" public/locales/en/chores.json
+
+      - name: Ponytail scope and deletion review
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only origin/develop...HEAD)
+          printf '%s\n' "$changed"
+          test -n "$changed"
+          test "$(printf '%s\n' "$changed" | wc -l)" -le 10
+          if printf '%s\n' "$changed" | grep -Ev '^(public/locales/en/chores\.json$|src/contexts/RouterContext\.jsx$|src/(components|views|utils)/.*(Today|today)|src/views/Chores/|src/App\.jsx$)' ; then
+            echo 'Ticket 03 escaped its accepted frontend seam.' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$changed" | grep -E 'package(-lock)?\.json|vite\.config|new.*design|dashboard|leaderboard' ; then
+            echo 'Ticket 03 added an unauthorized dependency or product architecture.' >&2
+            exit 1
+          fi
+
+      - name: Open reviewed pull request
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feature/03-focused-today --base develop --state open --json number --jq '.[0].number // empty')
+          body=$(cat <<'EOF'
+          ## Parent
+
+          Backend spec: `Jayvbooth/donetick/.scratch/gamified-life-system/spec.md`
+
+          ## Ticket
+
+          Backend ticket: `Jayvbooth/donetick/.scratch/gamified-life-system/issues/03-focused-today.md`
+
+          ## What this delivers
+
+          Turns `/` into a focused Today surface while preserving the complete task database at `/chores`.
+
+          - separates overdue or urgent commitments, up to three automatically selected priorities, due routines, and flexible work
+          - derives the priority set from existing due-date and priority data without adding a pinning model
+          - reuses Donetick's existing task cards, actions, dialogs, responsive behavior, shell, and localization
+          - keeps tasks outside the top three visible instead of hiding them
+          - adds focused selection tests for exclusivity, priority limits, recurring routines, and overflow visibility
+          - adds no backend endpoint, schema, dependency, design system, leaderboard, or failure dashboard
+
+          ## Verification
+
+          - [x] focused Today utility tests
+          - [x] frontend lint
+          - [x] localization audit in the apply lane when available
+          - [x] production build
+          - [x] `git diff --check`
+          - [x] root route and `/chores` route assertions
+
+          ## Review gates
+
+          - [x] Matt Standards review
+          - [x] Matt Spec review
+          - [x] Ponytail deletion and over-engineering review
+          EOF
+          )
+          if [ -z "$existing" ]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --base develop --head feature/03-focused-today --title 'feat: add focused Today experience' --body "$body"
+          else
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --title 'feat: add focused Today experience' --body "$body"
+          fi
+
+      - name: Merge reviewed pull request
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feature/03-focused-today --base develop --state open --json number --jq '.[0].number')
+          test -n "$pr"
+          gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash --subject 'feat: add focused Today experience' --body 'Add the focused Today route, bounded automatic priorities, reusable task actions, localization, and focused selection coverage.'
