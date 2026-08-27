@@ -1,4 +1,41 @@
 {
+  "today": {
+    "documentTitle": "Donetick: Today",
+    "title": "Today",
+    "subtitle": "What matters now, without the entire task list.",
+    "allTasks": "All tasks",
+    "newTask": "New task",
+    "taskCount_one": "{{count}} task",
+    "taskCount_other": "{{count}} tasks",
+    "sections": {
+      "urgent": {
+        "title": "Needs attention",
+        "description": "Overdue, in progress, paused, or waiting for approval."
+      },
+      "priorities": {
+        "title": "Top priorities",
+        "description": "Up to three tasks selected from existing due dates and priorities."
+      },
+      "routines": {
+        "title": "Routines",
+        "description": "Recurring responsibilities due today."
+      },
+      "flexible": {
+        "title": "Flexible work",
+        "description": "Other work available today, including priority overflow."
+      }
+    },
+    "emptyTitle": "No tasks yet",
+    "emptyDescription": "Create your first task and it will appear here when it matters.",
+    "clearTitle": "You are clear for today",
+    "clearDescription": "Nothing needs your attention right now. The full task list is still available.",
+    "errorTitle": "Today could not be loaded",
+    "errorDescription": "Donetick could not reach your tasks. Check the connection and try again.",
+    "retry": "Try again",
+    "laterCount_one": "{{count}} other task is scheduled later.",
+    "laterCount_other": "{{count}} other tasks are scheduled later.",
+    "reviewAll": "Review all tasks"
+  },
   "title": "Chores",
   "myChores": "My Chores",
   "allChores": "All Chores",
