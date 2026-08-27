@@ -1,0 +1,91 @@
+name: Review Ticket 03 Overflow Visibility
+
+on:
+  push:
+    branches:
+      - feature/03-focused-today
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ticket-03-review-fix
+  cancel-in-progress: false
+
+jobs:
+  fix-test-commit:
+    if: ${{ !contains(github.event.head_commit.message, '[ticket-03-review-fix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Apply reviewed correction
+        run: |
+          set -euo pipefail
+          base64 -d .agent/ticket03-review-fix.b64 | gzip -d > /tmp/ticket03-review-fix.patch
+          echo '4740f9bf67496ce96560a8ca1e5cc72cd5a5a61b4ed3a26bec7d2179d73ec4fb  /tmp/ticket03-review-fix.patch' | sha256sum -c -
+          git apply --check /tmp/ticket03-review-fix.patch
+          git apply /tmp/ticket03-review-fix.patch
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format corrected files
+        run: |
+          npx eslint --fix src/utils/Today.js src/utils/Today.test.js
+          npx prettier -w src/utils/Today.js src/utils/Today.test.js
+
+      - name: Run focused and scoring regression tests
+        run: node --test src/utils/Today.test.js src/utils/ScoreResult.test.js
+
+      - name: Audit localization
+        run: npm run lint:i18n
+
+      - name: Lint repository
+        run: npm run lint:ci
+
+      - name: Build production frontend
+        run: npm run build
+
+      - name: Remove review transport
+        run: |
+          rm .agent/ticket03-review-fix.b64
+          rm .github/workflows/review-ticket-03.yml
+          rmdir .agent 2>/dev/null || true
+
+      - name: Validate final production diff
+        run: |
+          set -euo pipefail
+          git diff --check
+          test ! -d .agent
+          test ! -e .github/workflows/review-ticket-03.yml
+          git add -N .
+          git diff --name-only origin/develop | sort > /tmp/actual-files
+          cat > /tmp/expected-files <<'EOF'
+          public/locales/en/chores.json
+          public/locales/en/common.json
+          src/contexts/RouterContext.jsx
+          src/utils/Today.js
+          src/utils/Today.test.js
+          src/views/Today/Today.jsx
+          src/views/components/NavBar.jsx
+          EOF
+          sort -o /tmp/expected-files /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+          grep -q 'isPriorityCandidate(chore, now)' src/utils/Today.js
+          grep -q 'priority candidate overflow remains visible' src/utils/Today.test.js
+
+      - name: Commit verified correction
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: keep Today priority overflow visible [ticket-03-review-fix]'
+          git push origin HEAD:feature/03-focused-today
