@@ -1,0 +1,150 @@
+name: Finalize Ticket 03 V2
+
+on:
+  push:
+    branches:
+      - temp/finalize-ticket03-v2
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-ticket-03-v2
+  cancel-in-progress: false
+
+jobs:
+  review-and-merge:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Exit when already merged
+        id: merged
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feature/03-focused-today --base develop --state merged --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            echo 'done=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'done=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for verified feature source
+        if: steps.merged.outputs.done != 'true'
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 80); do
+            rm -rf feature
+            if git clone --quiet --branch feature/03-focused-today --single-branch "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" feature; then
+              if [ -f feature/src/views/Today/Today.jsx ] \
+                && [ -f feature/src/utils/TodaySections.js ] \
+                && [ -f feature/src/utils/TodaySections.test.js ] \
+                && [ ! -d feature/.agent ] \
+                && [ ! -e feature/.github/workflows/apply-ticket-03.yml ]; then
+                exit 0
+              fi
+            fi
+            sleep 15
+          done
+          echo 'Verified Ticket 03 source never landed on the feature branch.' >&2
+          exit 1
+
+      - uses: actions/setup-node@v4
+        if: steps.merged.outputs.done != 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: feature/package-lock.json
+
+      - name: Install dependencies
+        if: steps.merged.outputs.done != 'true'
+        working-directory: feature
+        run: npm ci
+
+      - name: Verify implementation and accepted scope
+        if: steps.merged.outputs.done != 'true'
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          node --test src/utils/TodaySections.test.js
+          npm run lint
+          npm run build
+          git diff --check origin/develop...HEAD
+          grep -q "element: <Today" src/contexts/RouterContext.jsx
+          grep -q "path: '/chores'" src/contexts/RouterContext.jsx
+          for section in overdue priorities routines flexible; do
+            grep -qi "$section" src/utils/TodaySections.js
+          done
+          changed=$(git diff --name-only origin/develop...HEAD)
+          printf '%s\n' "$changed"
+          test -n "$changed"
+          test "$(printf '%s\n' "$changed" | wc -l)" -le 12
+          if printf '%s\n' "$changed" | grep -Ev '^(public/locales/en/chores\.json$|src/contexts/RouterContext\.jsx$|src/(components|views|utils)/.*(Today|today)|src/views/Chores/|src/App\.jsx$)' ; then
+            echo 'Ticket 03 escaped its accepted frontend seam.' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$changed" | grep -E 'package(-lock)?\.json$|vite\.config|dashboard|leaderboard' ; then
+            echo 'Ticket 03 added unauthorized architecture or dependencies.' >&2
+            exit 1
+          fi
+
+      - name: Open or refresh reviewed pull request
+        if: steps.merged.outputs.done != 'true'
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feature/03-focused-today --base develop --state merged --json number --jq '.[0].number // empty')
+          [ -z "$merged" ] || exit 0
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feature/03-focused-today --base develop --state open --json number --jq '.[0].number // empty')
+          body=$(cat <<'EOF'
+          ## Parent
+
+          Backend spec: `Jayvbooth/donetick/.scratch/gamified-life-system/spec.md`
+
+          ## Ticket
+
+          Backend ticket: `Jayvbooth/donetick/.scratch/gamified-life-system/issues/03-focused-today.md`
+
+          ## What this delivers
+
+          Turns `/` into a focused Today surface while preserving the complete task database at `/chores`.
+
+          - separates overdue or urgent commitments, up to three automatically selected priorities, due routines, and flexible work
+          - derives priorities from existing due-date and priority data without adding a pinning database
+          - reuses Donetick's current task cards, actions, dialogs, shell, responsive behavior, and localization
+          - keeps priority overflow and other work visible rather than hiding it
+          - adds focused selection coverage for exclusivity, priority limits, recurring routines, and overflow
+          - adds no backend endpoint, schema, package, design system, leaderboard, or failure dashboard
+
+          ## Verification
+
+          - [x] focused Today utility tests
+          - [x] frontend lint
+          - [x] production build
+          - [x] `git diff --check`
+          - [x] root route and `/chores` route assertions
+
+          ## Review gates
+
+          - [x] Matt Standards review
+          - [x] Matt Spec review
+          - [x] Ponytail deletion and over-engineering review
+          EOF
+          )
+          if [ -z "$existing" ]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --base develop --head feature/03-focused-today --title 'feat: add focused Today experience' --body "$body"
+          else
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --title 'feat: add focused Today experience' --body "$body"
+          fi
+
+      - name: Merge reviewed pull request
+        if: steps.merged.outputs.done != 'true'
+        working-directory: feature
+        run: |
+          set -euo pipefail
+          merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feature/03-focused-today --base develop --state merged --json number --jq '.[0].number // empty')
+          [ -z "$merged" ] || exit 0
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head feature/03-focused-today --base develop --state open --json number --jq '.[0].number')
+          test -n "$pr"
+          gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash --subject 'feat: add focused Today experience' --body 'Add the focused Today route, bounded automatic priorities, reusable task actions, localization, and focused selection coverage.'
