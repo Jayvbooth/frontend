@@ -29,10 +29,39 @@ jobs:
       - name: Apply reviewed correction
         run: |
           set -euo pipefail
-          base64 -d .agent/ticket03-review-fix.b64 | gzip -d > /tmp/ticket03-review-fix.patch
-          echo '4740f9bf67496ce96560a8ca1e5cc72cd5a5a61b4ed3a26bec7d2179d73ec4fb  /tmp/ticket03-review-fix.patch' | sha256sum -c -
-          git apply --check /tmp/ticket03-review-fix.patch
-          git apply /tmp/ticket03-review-fix.patch
+          python - <<'PY'
+          from pathlib import Path
+
+          today_path = Path('src/utils/Today.js')
+          today = today_path.read_text()
+          old_visibility = '      return !due || due.getTime() <= todayEnd || hasPriority(chore)\n'
+          new_visibility = '      return !due || due.getTime() <= todayEnd || isPriorityCandidate(chore, now)\n'
+          if today.count(old_visibility) != 1:
+              raise RuntimeError('Today overflow visibility seam was not found exactly once')
+          today_path.write_text(today.replace(old_visibility, new_visibility, 1))
+
+          test_path = Path('src/utils/Today.test.js')
+          tests = test_path.read_text()
+          replacements = [
+              (
+                  "test('priority overflow remains visible as flexible work', () => {",
+                  "test('priority candidate overflow remains visible as flexible work', () => {",
+              ),
+              (
+                  "    [1, 2, 3, 4].map(id => task(id, { nextDueDate: at(id), priority: id })),",
+                  "    [\n      ...[1, 2, 3, 4].map(id =>\n        task(id, { nextDueDate: at(id), priority: id }),\n      ),\n      task(5, { nextDueDate: at(5) }),\n    ],",
+              ),
+              (
+                  '  assert.deepEqual(ids(result.flexible), [4])',
+                  '  assert.deepEqual(ids(result.flexible), [4, 5])',
+              ),
+          ]
+          for old, new in replacements:
+              if tests.count(old) != 1:
+                  raise RuntimeError(f'Test review seam was not found exactly once: {old}')
+              tests = tests.replace(old, new, 1)
+          test_path.write_text(tests)
+          PY
 
       - name: Install dependencies
         run: npm ci
