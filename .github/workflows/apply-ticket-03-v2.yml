@@ -1,0 +1,116 @@
+name: Apply Ticket 03 Focused Today V2
+
+on:
+  push:
+    branches:
+      - feature/03-focused-today-v2
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ticket-03-focused-today-v2
+  cancel-in-progress: false
+
+jobs:
+  apply-test-commit:
+    if: ${{ !contains(github.event.head_commit.message, '[ticket-03-v2]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Download and apply reviewed source patch
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            https://filebin.net/oai-ticket03-20260827-a7f4/ticket03-final.patch \
+            -o /tmp/ticket03.patch
+          test -s /tmp/ticket03.patch
+          git apply --check /tmp/ticket03.patch
+          git apply /tmp/ticket03.patch
+
+      - name: Verify bounded Ticket 03 scope
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only)
+          printf '%s\n' "$changed"
+          test -n "$changed"
+          test "$(printf '%s\n' "$changed" | wc -l)" -le 12
+          if printf '%s\n' "$changed" | grep -Ev '^(public/locales/en/chores\.json$|src/contexts/RouterContext\.jsx$|src/(components|views|utils)/.*(Today|today)|src/views/Chores/|src/App\.jsx$)' ; then
+            echo 'Ticket 03 patch touched a path outside the accepted frontend seam.' >&2
+            exit 1
+          fi
+          test -f src/views/Today/Today.jsx
+          test -f src/utils/TodaySections.js
+          test -f src/utils/TodaySections.test.js
+          grep -q "element: <Today" src/contexts/RouterContext.jsx
+          grep -q "path: '/chores'" src/contexts/RouterContext.jsx
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format touched files
+        run: |
+          set -euo pipefail
+          files=$(git diff --name-only --diff-filter=ACM | grep -E '\.(js|jsx|json)$' || true)
+          test -n "$files"
+          npx prettier --write $files
+
+      - name: Run focused Today tests
+        run: node --test src/utils/TodaySections.test.js
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Audit localization when available
+        run: |
+          set -euo pipefail
+          if [ -f scripts/audit-locales.mjs ]; then
+            node scripts/audit-locales.mjs
+          elif [ -f scripts/audit-locales.js ]; then
+            node scripts/audit-locales.js
+          else
+            node - <<'NODE'
+          const pkg = require('./package.json')
+          const names = ['i18n:audit', 'audit:i18n', 'lint:i18n', 'locales:audit']
+          const name = names.find(key => pkg.scripts?.[key])
+          if (name) {
+            const { spawnSync } = require('node:child_process')
+            const result = spawnSync('npm', ['run', name], { stdio: 'inherit' })
+            process.exit(result.status ?? 1)
+          }
+          NODE
+          fi
+
+      - name: Build production frontend
+        run: npm run build
+
+      - name: Remove transport workflow
+        run: rm .github/workflows/apply-ticket-03-v2.yml
+
+      - name: Validate final production diff
+        run: |
+          set -euo pipefail
+          git diff --check
+          test ! -e .github/workflows/apply-ticket-03-v2.yml
+          test -f src/views/Today/Today.jsx
+          test -f src/utils/TodaySections.js
+          test -f src/utils/TodaySections.test.js
+          grep -q "element: <Today" src/contexts/RouterContext.jsx
+          grep -q "path: '/chores'" src/contexts/RouterContext.jsx
+
+      - name: Commit verified source
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: add focused Today experience [ticket-03-v2]'
+          git push origin HEAD:feature/03-focused-today-v2
