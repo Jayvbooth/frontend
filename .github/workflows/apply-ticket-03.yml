@@ -83,6 +83,7 @@ jobs:
           git diff --check
           test ! -d .agent
           test ! -e .github/workflows/apply-ticket-03.yml
+          git add -N .
           git diff --name-only origin/develop | sort > /tmp/actual-files
           cat > /tmp/expected-files <<'EOF'
           public/locales/en/chores.json
