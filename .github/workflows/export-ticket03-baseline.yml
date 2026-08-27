@@ -1,0 +1,27 @@
+name: Export Ticket 03 Baseline
+
+on:
+  push:
+    branches:
+      - temp/export-ticket03-baseline
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package source
+        run: |
+          tar --exclude=.git -czf /tmp/frontend-ticket03-baseline.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-ticket03-baseline
+          path: /tmp/frontend-ticket03-baseline.tar.gz
+          retention-days: 1
