@@ -47,6 +47,7 @@
   "version": "Version",
   "navigation": {
     "search": "Search",
+    "today": "Today",
     "allTasks": "All Tasks",
     "archived": "Archived",
     "things": "Things",

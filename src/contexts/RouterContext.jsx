@@ -52,6 +52,7 @@ import TestView from '../views/TestView/Test'
 import ThingsHistory from '../views/Things/ThingsHistory'
 import ThingsView from '../views/Things/ThingsView'
 import TimerDetails from '../views/Timer/TimerDetails'
+import Today from '../views/Today/Today'
 import UserActivities from '../views/User/UserActivities'
 import UserPoints from '../views/User/UserPoints'
 const Router = createBrowserRouter([
@@ -62,7 +63,7 @@ const Router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <MyChores />,
+        element: <Today />,
       },
       {
         path: '/settings',

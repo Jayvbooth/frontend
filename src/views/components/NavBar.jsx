@@ -12,6 +12,7 @@ import {
   ReportProblem,
   SearchRounded,
   SettingsOutlined,
+  TodayRounded,
   Toll,
   Widgets,
 } from '@mui/icons-material'
@@ -54,6 +55,11 @@ const NavBar = () => {
       label: t('navigation.search'),
       icon: <SearchRounded />,
       onClick: () => openSearch(),
+    },
+    {
+      to: '/',
+      label: t('navigation.today'),
+      icon: <TodayRounded />,
     },
     {
       to: '/chores',
