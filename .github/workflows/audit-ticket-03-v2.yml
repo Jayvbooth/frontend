@@ -1,0 +1,64 @@
+name: Audit Ticket 03 Post Merge V2
+
+on:
+  push:
+    branches:
+      - temp/audit-ticket03-v2
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Verify merged source and tracker
+        run: |
+          set -euo pipefail
+          test -f src/views/Today/Today.jsx
+          test -f src/utils/TodaySections.js
+          test -f src/utils/TodaySections.test.js
+          grep -q "element: <Today" src/contexts/RouterContext.jsx
+          grep -q "path: '/chores'" src/contexts/RouterContext.jsx
+          ticket=$(curl -fsSL https://raw.githubusercontent.com/Jayvbooth/donetick/develop/.scratch/gamified-life-system/issues/03-focused-today.md)
+          printf '%s' "$ticket" | grep -q '^\*\*Status:\*\* done'
+          printf '%s' "$ticket" | grep -q '^\*\*Merged:\*\* `Jayvbooth/frontend#'
+          test ! -d .agent
+          test ! -e .github/workflows/apply-ticket-03.yml
+          test ! -e .github/workflows/apply-ticket-03-v2.yml
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run focused tests
+        run: node --test src/utils/TodaySections.test.js
+
+      - name: Lint merged frontend
+        run: npm run lint
+
+      - name: Build merged frontend
+        run: npm run build
+
+      - name: Record post-merge audit on PR
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --state merged --search 'focused Today experience in:title' --json number,mergedAt --jq 'sort_by(.mergedAt) | reverse | .[0].number')
+          test -n "$pr"
+          gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body $'Post-merge audit passed on `develop`.\n\n- focused Today selection tests passed\n- frontend lint passed\n- production build passed\n- `/` resolves to Today\n- `/chores` remains the full task database\n- Ticket 03 tracker is marked done\n- no patch transport or temporary workflow remains in production'
+
+      - name: Remove audit branch
+        run: |
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/temp%2Faudit-ticket03-v2" >/dev/null
