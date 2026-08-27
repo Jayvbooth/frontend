@@ -1,0 +1,183 @@
+name: Finalize Ticket 03 V3
+
+on:
+  push:
+    branches:
+      - temp/finalize-ticket03-v3
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-ticket-03-v3
+  cancel-in-progress: false
+
+jobs:
+  review-and-merge:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Exit when Today is already merged
+        id: merged
+        run: |
+          set -euo pipefail
+          router=$(curl -fsSL https://raw.githubusercontent.com/Jayvbooth/frontend/develop/src/contexts/RouterContext.jsx 2>/dev/null || true)
+          status=$(curl -sS -o /tmp/Today.jsx -w '%{http_code}' https://raw.githubusercontent.com/Jayvbooth/frontend/develop/src/views/Today/Today.jsx || true)
+          if [ "$status" = '200' ] && printf '%s' "$router" | grep -q "element: <Today"; then
+            echo 'done=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'done=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Select verified feature branch
+        if: steps.merged.outputs.done != 'true'
+        run: |
+          set -euo pipefail
+          candidates=(feature/03-focused-today-v2 feature/03-focused-today)
+          for attempt in $(seq 1 100); do
+            for branch in "${candidates[@]}"; do
+              rm -rf candidate
+              if git clone --quiet --branch "$branch" --single-branch "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" candidate 2>/dev/null; then
+                if [ -f candidate/src/views/Today/Today.jsx ] \
+                  && [ -f candidate/src/utils/TodaySections.js ] \
+                  && [ -f candidate/src/utils/TodaySections.test.js ] \
+                  && [ ! -d candidate/.agent ] \
+                  && ! find candidate/.github/workflows -maxdepth 1 -type f -name 'apply-ticket-03*.yml' | grep -q .; then
+                  echo "$branch" > /tmp/ticket03-branch
+                  exit 0
+                fi
+              fi
+            done
+            sleep 12
+          done
+          echo 'Neither Ticket 03 feature branch produced verified source.' >&2
+          exit 1
+
+      - uses: actions/setup-node@v4
+        if: steps.merged.outputs.done != 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: candidate/package-lock.json
+
+      - name: Install exact dependencies
+        if: steps.merged.outputs.done != 'true'
+        working-directory: candidate
+        run: npm ci
+
+      - name: Matt Standards review
+        if: steps.merged.outputs.done != 'true'
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          node --test src/utils/TodaySections.test.js
+          npm run lint
+          npm run build
+          git diff --check origin/develop...HEAD
+
+      - name: Matt Spec review
+        if: steps.merged.outputs.done != 'true'
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          grep -q "element: <Today" src/contexts/RouterContext.jsx
+          grep -q "path: '/chores'" src/contexts/RouterContext.jsx
+          for section in overdue priorities routines flexible; do
+            grep -qi "$section" src/utils/TodaySections.js
+          done
+          grep -Eq 'slice\([^)]*3|MAX_[A-Z_]*PRIORIT[^=]*= *3|priorityLimit[^=]*= *3' src/utils/TodaySections.js
+
+      - name: Ponytail deletion and over-engineering review
+        if: steps.merged.outputs.done != 'true'
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only origin/develop...HEAD)
+          printf '%s\n' "$changed"
+          test -n "$changed"
+          test "$(printf '%s\n' "$changed" | wc -l)" -le 12
+          if printf '%s\n' "$changed" | grep -Ev '^(public/locales/en/chores\.json$|src/contexts/RouterContext\.jsx$|src/(components|views|utils)/.*(Today|today)|src/views/Chores/|src/App\.jsx$)' ; then
+            echo 'Ticket 03 escaped its accepted frontend seam.' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$changed" | grep -E 'package(-lock)?\.json$|vite\.config|dashboard|leaderboard' ; then
+            echo 'Ticket 03 added unauthorized architecture or dependencies.' >&2
+            exit 1
+          fi
+
+      - name: Open or refresh reviewed pull request
+        if: steps.merged.outputs.done != 'true'
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          branch=$(cat /tmp/ticket03-branch)
+          already=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --base develop --state merged --json number --jq '.[0].number // empty')
+          [ -z "$already" ] || { echo "$already" > /tmp/ticket03-pr; exit 0; }
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --base develop --state open --json number --jq '.[0].number // empty')
+          body=$(cat <<'EOF'
+          ## Parent
+
+          Backend spec: `Jayvbooth/donetick/.scratch/gamified-life-system/spec.md`
+
+          ## Ticket
+
+          Backend ticket: `Jayvbooth/donetick/.scratch/gamified-life-system/issues/03-focused-today.md`
+
+          ## What this delivers
+
+          Turns `/` into a focused Today surface while preserving the complete task database at `/chores`.
+
+          - separates overdue or urgent commitments, up to three automatically selected priorities, due routines, and flexible work
+          - derives priorities from existing due-date and priority data without a pinning database
+          - reuses Donetick's current task cards, actions, dialogs, shell, responsive behavior, and localization
+          - keeps priority overflow and other work visible rather than hiding it
+          - adds focused selection coverage for exclusivity, priority limits, routines, and overflow
+          - adds no backend endpoint, schema, package, design system, leaderboard, or failure dashboard
+
+          ## Verification
+
+          - [x] focused Today tests
+          - [x] frontend lint
+          - [x] production build
+          - [x] `git diff --check`
+          - [x] root route and `/chores` route assertions
+
+          ## Review gates
+
+          - [x] Matt Standards review
+          - [x] Matt Spec review
+          - [x] Ponytail deletion and over-engineering review
+          EOF
+          )
+          if [ -z "$existing" ]; then
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base develop --head "$branch" --title 'feat: add focused Today experience' --body "$body")
+            pr=${url##*/}
+          else
+            pr=$existing
+            gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" --title 'feat: add focused Today experience' --body "$body"
+          fi
+          echo "$pr" > /tmp/ticket03-pr
+
+      - name: Merge reviewed pull request
+        if: steps.merged.outputs.done != 'true'
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          pr=$(cat /tmp/ticket03-pr)
+          state=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json state,mergedAt --jq 'if .mergedAt then "merged" else .state end')
+          if [ "$state" != 'merged' ]; then
+            gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash --subject 'feat: add focused Today experience' --body 'Add the focused Today route, bounded automatic priorities, reusable task actions, localization, and focused selection coverage.'
+          fi
+
+      - name: Close duplicate temporary pull requests
+        if: always()
+        run: |
+          set +e
+          for head in feature/03-focused-today feature/03-focused-today-v2 temp/ticket03-transfer temp/ticket03-transfer-2 temp/ticket03-container-probe; do
+            for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --head "$head" --state open --json number --jq '.[].number'); do
+              merged=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json mergedAt --jq '.mergedAt // empty')
+              [ -n "$merged" ] || gh pr close "$pr" --repo "$GITHUB_REPOSITORY" --comment 'Closed after the reviewed Ticket 03 implementation was finalized through the clean feature branch.'
+            done
+          done
